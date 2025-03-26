@@ -1,7 +1,7 @@
 package sql
 
 import (
-	"cmp-common/sql/model"
+	"github.com/hsjahng/cmp-common/sql/model"
 	"github.com/jmoiron/sqlx"
 )
 

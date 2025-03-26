@@ -13,45 +13,56 @@ var zapLogger *zap.Logger
 var sugaredLogger *zap.SugaredLogger
 
 // InitLogger: 로그 파일을 최상위 디렉토리에 날짜별로 저장
-func InitLogger(level string) {
-
+func InitLogger(level string, saveLogFile bool) {
+	// 로그파일 로컬에 저장할건지 안할건지 선택
 	loc, err := time.LoadLocation("Asia/Seoul")
 	if err != nil {
 		fmt.Printf("location err :%v\n", err)
 	}
 
-	now := time.Now()
-	kst := now.In(loc).Format("2006-01-02")
-	// 최상위 경로에 로그파일 설정
-	fmt.Println("InitLogger 로그 파일 패스 설정")
-	logFilePath := filepath.Join(".", "pds-integration-service-"+kst+".log")
-
-	logLevel, err := zapcore.ParseLevel(level)
-	if err != nil {
-		fmt.Printf("ParseLevel err :%v\n", err)
-	}
-
-	// 로컬 파일로 로그 저장 설정
-	fmt.Println("InitLogger 로컬 파일로 로그 저장 설정")
-	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		fmt.Printf("OpenFile err :%v\n", err)
-	}
-	fileSync := zapcore.AddSync(logFile)
-
+	logLevel := zapcore.ErrorLevel
+	var fileSync zapcore.WriteSyncer
+	var consoleEncoder zapcore.Encoder
 	consoleEncoderConfig := zap.NewProductionEncoderConfig()
 	consoleEncoderConfig.TimeKey = "timestamp"
 	consoleEncoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 		kst := t.UTC().Add(9 * time.Hour)
 		enc.AppendString(kst.Format("2006-01-02T15:04:05"))
 	}
-
 	// 콘솔 출력과 파일 출력 설정
-	consoleEncoder := zapcore.NewConsoleEncoder(consoleEncoderConfig)
-	core := zapcore.NewTee(
-		zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), logLevel), // 콘솔 출력
-		zapcore.NewCore(consoleEncoder, fileSync, logLevel),                   // 파일 출력
-	)
+	consoleEncoder = zapcore.NewConsoleEncoder(consoleEncoderConfig)
+	if saveLogFile {
+		now := time.Now()
+		kst := now.In(loc).Format("2006-01-02")
+		// 최상위 경로에 로그파일 설정
+		fmt.Println("InitLogger 로그 파일 패스 설정")
+		logFilePath := filepath.Join(".", "pds-integration-service-"+kst+".log")
+
+		logLevel, err = zapcore.ParseLevel(level)
+		if err != nil {
+			fmt.Printf("ParseLevel err :%v\n", err)
+		}
+
+		// 로컬 파일로 로그 저장 설정
+		fmt.Println("InitLogger 로컬 파일로 로그 저장 설정")
+		logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("OpenFile err :%v\n", err)
+		}
+		fileSync = zapcore.AddSync(logFile)
+	}
+
+	cores := []zapcore.Core{}
+	cores = append(cores, zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), logLevel)) // 콘솔 출력
+	if saveLogFile {
+		cores = append(cores, zapcore.NewCore(consoleEncoder, fileSync, logLevel)) // 선택적 파일 출력
+	}
+
+	core := zapcore.NewTee(cores...)
+	//core := zapcore.NewTee(
+	//	zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), logLevel),
+	//	zapcore.NewCore(consoleEncoder, fileSync, logLevel),
+	//)
 
 	// Zap 로거 생성
 	zapLogger = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
