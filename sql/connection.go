@@ -1,63 +1,82 @@
 package sql
 
 import (
+	"errors"
+	"github.com/hsjahng/cmp-common/logger"
 	"github.com/hsjahng/cmp-common/sql/model"
-	"github.com/jmoiron/sqlx"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
+	"log"
+	"os"
+	"time"
 )
 
-var db *sqlx.DB
-var Dsn string
+// MariaDB
+type DbType string
 
-type DB struct {
-	Dsn    string
-	DbType model.DB_TYPE
-	DB     *sqlx.DB
+// db_common
+type DbDsn string
+
+const (
+	MYSQL DbType = "MARIADB"
+)
+
+func (d DbType) String() string {
+	return string(d)
+}
+
+const (
+	DB_COMMON  DbDsn = "maestro:okestro2018@tcp(172.10.50.30:32006)/dp_common_pds_test?charset=utf8mb4&parseTime=True&loc=Local"
+	DB_DEFAULT DbDsn = "maestro:okestro2018@tcp(172.10.50.30:32006)/dp_common_pds_test?charset=utf8mb4&parseTime=True&loc=Local"
+)
+
+// db 선택을 먼저 한다
+// 스키마 선택을 한다
+// 이는 다른 변수로 구성해야한다
+
+func (d DbDsn) GetDsn() string {
+	return string(d)
 }
 
 type Connection interface {
-	Connect() (*sqlx.DB, error)
+	Connect() (*gorm.DB, error)
 }
 
-func NewDBConnection(dbType model.DB_TYPE) {
-
+func NewDBConnection(dbType model.DB_TYPE, dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
+	var db *gorm.DB
 	switch dbType {
 	case model.MARIADB:
-		Dsn = "maestro:okestro2018@tcp(172.10.50.30:32006)/dp_common_pds_test?charset=utf8mb4&parseTime=True&loc=Local"
-	//case model.PROMETHEUS:
-	//	Dsn = "prom-prometheus-prometheus-test:9090"
+		return GetDB(dbDsn, logMode)
 	default:
 
 	}
+	return db, nil
 }
 
-func (m *DB) GetDB() (*sqlx.DB, error) {
-	//logger.GetSugaredLogger().Debugf("MariaDB Conntect 실행")
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		errMsg := fmt.Sprintf("panic occurred: %v", r)
-	//		logger.GetSugaredLogger().Error(errMsg)
-	//		err = errors.New(errMsg)
-	//		return
-	//	}
-	//}()
-	//
-	//dsn := server_config.GetCfg().DbInfo.Dsn
-	//logger.GetSugaredLogger().Debugf("InitDB dsn: %v", dsn)
-	//db, err := sqlx.Connect(server_config.GetCfg().DbInfo.DbType, dsn)
-	//if err != nil {
-	//	errMsg := fmt.Sprintf("failed to connect to MariaDB: %v", err)
-	//	logger.GetSugaredLogger().Error(errMsg)
-	//	return errors.New(errMsg)
-	//}
-	//
-	//// 연결 풀 설정
-	//db.SetMaxOpenConns(12)
-	//db.SetMaxIdleConns(12)
-	//db.SetConnMaxLifetime(30 * time.Minute)
-	//
-	//m.db = db
-	//
-	//logger.GetSugaredLogger().Info("Succeed to initialize MariaDB connection")
-	//return m.
-	return nil, nil
+// Maria DB 용
+func GetDB(dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
+	newLogger := gormLogger.New(
+		log.New(os.Stdout, "\r\n", log.LstdFlags),
+		gormLogger.Config{
+			SlowThreshold: 200 * time.Millisecond,
+			LogLevel:      logMode,
+			Colorful:      false,
+		},
+	)
+	sugaredLogger := logger.GetSugaredLogger()
+	if sugaredLogger == nil {
+		return nil, errors.New("sugared logger not initialized. Call InitLogger first")
+	}
+	sugaredLogger.Infof(dbDsn.GetDsn())
+
+	db, err := gorm.Open(mysql.Open(dbDsn.GetDsn()), &gorm.Config{
+		PrepareStmt: true,
+		Logger:      newLogger,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
