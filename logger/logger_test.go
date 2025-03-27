@@ -6,7 +6,7 @@ import (
 )
 
 func Test_Logger(t *testing.T) {
-	InitLogger(zap.InfoLevel.String(), false)
+	InitLogger(zap.InfoLevel.String())
 	logger := GetSugaredLogger()
 	logger.Debug("debug log..")
 	logger.Info("info log..")
