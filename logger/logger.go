@@ -68,7 +68,7 @@ func GetLogger() *zap.Logger {
 
 func GetSugaredLogger() *zap.SugaredLogger {
 	if sugaredLogger == nil {
-		GetSugaredLogger().Error("Sugared logger not initialized. Call InitLogger first")
+		fmt.Println("sugared logger not initialized. Call InitLogger first")
 	}
 	return sugaredLogger
 }
