@@ -3,7 +3,6 @@ package sql
 import (
 	"errors"
 	"github.com/hsjahng/cmp-common/logger"
-	"github.com/hsjahng/cmp-common/sql/model"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
@@ -31,22 +30,14 @@ const (
 	DB_DEFAULT DbDsn = "maestro:okestro2018@tcp(172.10.50.30:32006)/dp_common_pds_test?charset=utf8mb4&parseTime=True&loc=Local"
 )
 
-// db 선택을 먼저 한다
-// 스키마 선택을 한다
-// 이는 다른 변수로 구성해야한다
-
 func (d DbDsn) GetDsn() string {
 	return string(d)
 }
 
-type Connection interface {
-	Connect() (*gorm.DB, error)
-}
-
-func NewDBConnection(dbType model.DB_TYPE, dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
+func NewDBConnection(dbType DbType, dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
 	var db *gorm.DB
 	switch dbType {
-	case model.MARIADB:
+	case MYSQL:
 		return GetDB(dbDsn, logMode)
 	default:
 
@@ -79,4 +70,28 @@ func GetDB(dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+type RetryConfig struct {
+	MaxRetries  int
+	InitialWait time.Duration
+	MaxWait     time.Duration
+	Factor      float64
+	Jitter      float64
+}
+
+var DefaultRetryConfig = RetryConfig{
+	MaxRetries:  5,
+	InitialWait: 100 * time.Millisecond,
+	MaxWait:     10 * time.Second,
+	Factor:      2.0,
+	Jitter:      0.1,
+}
+
+func Connection() {
+	// retry backoff 를 추가해야함
+	// connection 관련된 오류는 여기서 처리해야함
+
+	// mock DB 를 만들어놓는것도 좋을 것 같다
+
 }
