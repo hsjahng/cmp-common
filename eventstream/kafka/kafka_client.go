@@ -24,9 +24,8 @@ type KafkaConfig struct {
 	SessionTimeout     time.Duration
 	MaxRetry           int
 	MaxProcessingTime  time.Duration
-	RequiredAcks       sarama.RequiredAcks
+	RequiredAcks       sarama.RequiredAcks // AckLevel
 	Version            sarama.KafkaVersion // 디폴트 버전?
-
 }
 
 func DefaultKafkaConfig() KafkaConfig {
@@ -74,10 +73,24 @@ func NewSaramaProducerConfig(config KafkaConfig) *sarama.Config {
 	saramaConfig.Version = config.Version
 
 	// 프로듀서 설정
-	saramaConfig.Producer.Return.Successes = true
 	saramaConfig.Producer.Return.Errors = true
 	saramaConfig.Producer.RequiredAcks = config.RequiredAcks
 	saramaConfig.Producer.Retry.Max = config.MaxRetry
+
+	saramaConfig.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		backoff := 100 * time.Millisecond * time.Duration(math.Pow(2, float64(retries)))
+		if backoff > 10*time.Second {
+			return 10 * time.Second
+		}
+		return backoff
+	}
+	saramaConfig.Producer.Return.Successes = true // 성공 응답 받기 위해 필요함
+
+	// 선택적인 추가 설정 필요하다면
+	// config.Producer.Compression = sarama.CompressionSnappy // 압축 방식
+	// config.Producer.Flush.Frequency = 500 * time.Millisecond // 배치 간격
+	// config.Producer.Partitioner = sarama.NewRandomPartitioner // 파티셔닝 전략
+	// config.Net.MaxOpenRequests = 10 // 브로커당 최대 10개의 동시요청 허용
 
 	// 파티션 선택 전략 (기본: 해시 기반 파티셔닝)
 	saramaConfig.Producer.Partitioner = sarama.NewHashPartitioner
@@ -85,7 +98,30 @@ func NewSaramaProducerConfig(config KafkaConfig) *sarama.Config {
 	return saramaConfig
 }
 
-func NewCmpProducer(brokers []string, ackLevel sarama.RequiredAcks) (sarama.SyncProducer, error) {
+func NewCmpConsumer(config *sarama.Config) (*sarama.Consumer, error) {
+	if len(Brokers) == 0 {
+		return nil, fmt.Errorf("no kafka brokers")
+	}
+	consumer, err := sarama.NewConsumer(Brokers, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create consumer: %v", err)
+	}
+	return &consumer, nil
+}
+
+func NewCmpProducer(config *sarama.Config) (*sarama.SyncProducer, error) {
+	if len(Brokers) == 0 {
+		return nil, fmt.Errorf("no kafka brokers")
+	}
+
+	producer, err := sarama.NewSyncProducer(Brokers, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kafka producer: %v", err)
+	}
+	return &producer, nil
+}
+
+func NewCmpProducerOld(brokers []string, ackLevel sarama.RequiredAcks) (sarama.SyncProducer, error) {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = ackLevel // 리더의 ack 만 받는상태
 	config.Producer.Retry.Max = RetryCount  // 재시도 횟수
