@@ -7,9 +7,13 @@ import (
 	"gorm.io/gorm"
 	gormLogger "gorm.io/gorm/logger"
 	"log"
+	"math/rand/v2"
 	"os"
 	"time"
 )
+
+//todo: mock DB 구성해놓을것..
+// sql 문 작성필요
 
 // MariaDB
 type DbType string
@@ -73,25 +77,56 @@ func GetDB(dbDsn DbDsn, logMode gormLogger.LogLevel) (*gorm.DB, error) {
 }
 
 type RetryConfig struct {
-	MaxRetries  int
-	InitialWait time.Duration
-	MaxWait     time.Duration
-	Factor      float64
-	Jitter      float64
+	MaxRetries  int // 최대 재시도 횟수
+	MaxInterval time.Duration
+	InitialWait time.Duration // 초기 대기시간
+	MaxWait     time.Duration // 최대 대기 시간
+	Factor      float64       // 백오프 승수
+	Jitter      float64       // 무작위성 추가
 }
 
 var DefaultRetryConfig = RetryConfig{
-	MaxRetries:  5,
+	MaxRetries:  10,
 	InitialWait: 100 * time.Millisecond,
 	MaxWait:     10 * time.Second,
 	Factor:      2.0,
-	Jitter:      0.1,
+	Jitter:      0.1, // 무작위성
 }
 
-func Connection() {
+func RetryConnection(db *gorm.DB, config *RetryConfig) {
 	// retry backoff 를 추가해야함
 	// connection 관련된 오류는 여기서 처리해야함
+	var cfg RetryConfig
+	if cfg.MaxRetries < 1 {
+		cfg = DefaultRetryConfig
+	}
 
-	// mock DB 를 만들어놓는것도 좋을 것 같다
+	currentInterval := cfg.InitialWait
 
+	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
+		// 첫 시도 또는 재시도 전에 지연 적용 (첫 시도는 지연 없음)
+		if attempt > 0 {
+			// 지터(랜덤성) 적용
+			jitterRange := currentInterval.Seconds() * cfg.Jitter
+			jitter := time.Duration((rand.Float64()*jitterRange*2 - jitterRange) * float64(time.Second))
+			sleepTime := currentInterval + jitter
+			time.Sleep(sleepTime)
+
+			// 다음 대기 시간 계산 (지수 백오프)
+			currentInterval = time.Duration(float64(currentInterval) * cfg.Factor)
+			if currentInterval > cfg.MaxInterval {
+				currentInterval = cfg.MaxInterval
+			}
+		}
+	}
+
+}
+
+func IsNonRetryableError(err error) bool {
+	// 무시해도 될 오류들은 지나치도록 한다
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return true
+	}
+
+	return false
 }
