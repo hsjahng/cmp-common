@@ -57,7 +57,7 @@ func NewSaramaConsumerConfig(config KafkaConfig) *sarama.Config {
 	saramaConfig.Consumer.Offsets.AutoCommit.Enable = config.EnableAutoCommit
 	saramaConfig.Consumer.Offsets.AutoCommit.Interval = config.AutoCommitInterval
 	saramaConfig.Consumer.Group.Session.Timeout = config.SessionTimeout
-	// Consumer 설정 추가
+
 	saramaConfig.Metadata.Retry.Max = config.MaxRetry
 	saramaConfig.Consumer.MaxProcessingTime = config.MaxProcessingTime
 
@@ -119,31 +119,4 @@ func NewCmpProducer(config *sarama.Config) (*sarama.SyncProducer, error) {
 		return nil, fmt.Errorf("failed to create kafka producer: %v", err)
 	}
 	return &producer, nil
-}
-
-func NewCmpProducerOld(brokers []string, ackLevel sarama.RequiredAcks) (sarama.SyncProducer, error) {
-	config := sarama.NewConfig()
-	config.Producer.RequiredAcks = ackLevel // 리더의 ack 만 받는상태
-	config.Producer.Retry.Max = RetryCount  // 재시도 횟수
-	config.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
-		backoff := 100 * time.Millisecond * time.Duration(math.Pow(2, float64(retries)))
-		if backoff > 10*time.Second {
-			return 10 * time.Second
-		}
-		return backoff
-	}
-	config.Producer.Return.Successes = true // 성공 응답 받기 위해 필요함
-
-	// 선택적인 추가 설정 필요하다면
-	// config.Producer.Compression = sarama.CompressionSnappy // 압축 방식
-	// config.Producer.Flush.Frequency = 500 * time.Millisecond // 배치 간격
-	// config.Producer.Partitioner = sarama.NewRandomPartitioner // 파티셔닝 전략
-	// config.Net.MaxOpenRequests = 10 // 브로커당 최대 10개의 동시요청 허용
-
-	producer, err := sarama.NewSyncProducer(brokers, config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating producer with config: %v", err)
-	}
-
-	return producer, nil
 }
