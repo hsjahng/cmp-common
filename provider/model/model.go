@@ -29,3 +29,18 @@ type ParsedMetaModel struct {
 	ProviderId string      // AWS, VMware Provider ID
 	Data       interface{} // 파싱된 데이터 (AWSInstance, VMWareVM 등)
 }
+
+type ProviderType int
+
+const (
+	OPENSTACK ProviderType = 1
+	K8S       ProviderType = 2
+	NCP       ProviderType = 3
+	AWS       ProviderType = 4
+	VSPHERE   ProviderType = 5
+	NETAPP    ProviderType = 6
+)
+
+func (p ProviderType) Int() int {
+	return int(p)
+}
