@@ -94,8 +94,7 @@ var DefaultRetryConfig = RetryConfig{
 }
 
 func RetryConnection(db *gorm.DB, config *RetryConfig) {
-	// retry backoff 를 추가해야함
-	// connection 관련된 오류는 여기서 처리해야함
+	//todo: connection 관련된 오류는 여기서 처리하는것으로
 	var cfg RetryConfig
 	if cfg.MaxRetries < 1 {
 		cfg = DefaultRetryConfig
