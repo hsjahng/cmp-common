@@ -70,7 +70,7 @@ func TestNewCmpProducer(t *testing.T) {
 	// Brokers 변수 임시 저장
 	originalBrokers := Brokers
 	// 테스트용 브로커 설정
-	Brokers = []string{"localhost:9092"}
+	Brokers = Brokers
 
 	// 테스트 완료 후 원래 값 복원
 	defer func() {
